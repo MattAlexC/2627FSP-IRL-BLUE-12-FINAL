@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jovian Clicker</title>
+
+  <!-- Import Instrument Serif from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- CSS fallback behind original hero video, visible if remote video is offline. -->
+  <div class="black-hole-fallback" aria-hidden="true"></div>
+
+  <!-- 1. Hero Background Video (Black Hole Silhouette) -->
+  <video
+    id="heroVideo"
+    class="bg-video"
+    autoplay
+    muted
+    loop
+    playsinline
+  >
+    <source src="https://designerstephen.github.io/public-assets/videos/observe-hero.mp4" type="video/mp4">
+  </video>
+
+  <!-- Looping soundtrack: menu & Creators use audio 1; gameplay uses audio 2.
+       Browser autoplay policies may require one interaction to enable sound. -->
+  <audio id="menuMusic" src="assets/audio-1.mp3" preload="auto" loop></audio>
+  <audio id="gameMusic" src="assets/audio-2.mp3" preload="auto" loop></audio>
+
+  <!-- 2. Slowed-Down Space & Meteorites Canvas (Creators Page Background) -->
+  <canvas id="spaceCanvas"></canvas>
+
+  <!-- 3. Light-Speed Warp Transition Canvas -->
+  <canvas id="warpCanvas"></canvas>
+
+  <!-- 4. Edge Vignette Overlay -->
+  <div class="edge-vignette"></div>
+
+  <!-- ==========================================================================
+       VIEW 1: Landing Page
+       ========================================================================== -->
+  <main class="viewport-container" id="landingView">
+    <header class="navbar liquid-glass liquid-glass-pill">
+      <div class="brand-logo">Sonions™</div>
+      <div class="nav-actions">
+        <button type="button" class="music-toggle" onclick="toggleMusic()" aria-label="Enable background music" aria-pressed="false"><span class="music-note" aria-hidden="true">♫</span><span class="music-status">Enable music</span></button>
+        <button class="creators-btn" onclick="transitionToCreators()">Creators</button>
+        <button type="button" class="nav-link nav-plain" onclick="openInstructions()">How to play</button>
+      </div>
+    </header>
+
+    <section class="hero-content">
+      <div class="title-veil"><h1 class="headline">Jovian <em>Clicker</em></h1></div>
+
+      <form class="waitlist-form liquid-glass liquid-glass-pill" id="playForm" onsubmit="event.preventDefault(); transitionToGame();">
+        <input
+          type="text"
+          class="email-input"
+          id="nicknameInput"
+          placeholder="Enter your nickname"
+          aria-label="Enter your nickname"
+          autocomplete="nickname"
+          maxlength="24"
+          required
+        />
+        <button type="submit" class="submit-button">Play <span aria-hidden="true">↗</span></button>
+      </form>
+    </section>
+
+    <div style="height: 36px;"></div>
+  </main>
+
+
+  <!-- VIEW 3: The singularity. No space canvas / stars are shown here. -->
+  <main class="viewport-container view-hidden" id="gameView" aria-label="Jovian Clicker game">
+    <header class="navbar liquid-glass liquid-glass-pill">
+      <div class="brand-logo">Sonions™</div>
+      <span class="game-nav-meta">THE SINGULARITY IS HUNGRY</span>
+      <div class="nav-actions">
+        <button type="button" class="music-toggle" onclick="toggleMusic()" aria-label="Enable background music" aria-pressed="false"><span class="music-note" aria-hidden="true">♫</span><span class="music-status">Enable music</span></button>
+        <button type="button" class="nav-link nav-plain" onclick="transitionToCreators()">Creators</button>
+        <button type="button" class="creators-btn" onclick="transitionToLanding()">Back to Home</button>
+      </div>
+    </header>
+    <div class="game-body">
+      <div class="player-chip"><span id="playerName">Traveler</span><span class="player-descriptor">· collector of questionable matter</span></div>
+      <section class="balance-block" aria-label="Your balance">
+        <div class="balance-label">Current balance</div>
+        <div class="balance-amount" id="balanceDisplay" aria-live="off">0</div>
+        <div class="balance-unit">jovianlings</div>
+        <div class="rate-strip"><span><b id="clickRateDisplay">1</b> / click</span><span class="dot"></span><span><b id="autoRateDisplay">0</b> / second</span></div>
+      </section>
+      <div class="game-stage">
+        <div class="jovian-stack">
+          <div class="jovian-reveal" id="jovianReveal">
+            <div class="jovian-sway">
+              <button class="jovian-clicker" id="jovianButton" type="button" aria-label="Click Jovian to earn jovianlings">
+                <img src="assets/jovian-clicker.jpg" alt="The colorful Jovian character" draggable="false">
+              </button>
+            </div>
+          </div>
+          <div class="click-hint">↑ <strong>CLICK THE JOVIAN</strong> ↑</div>
+        </div>
+      </div>
+      <aside class="upgrade-shop" id="upgradeShop" aria-label="Permanent upgrades shop">
+        <div class="shop-heading" id="shopHeading">
+          <div><h2>Jovian Emporium.</h2><small>PERMANENTLY QUESTIONABLE UPGRADES</small></div>
+          <div class="shop-counter" id="affordableCount">0 AFFORDABLE</div>
+          <div class="shop-toggle" id="shopToggleIcon" aria-hidden="true">⌃</div>
+        </div>
+        <div class="upgrade-list" id="upgradeList"></div>
+        <div class="shop-footer">Upgrades &amp; jovianlings autosave in this browser.</div>
+      </aside>
+      <div class="game-bottom">Lifetime jovianlings: <b id="lifetimeDisplay">0</b> &nbsp;·&nbsp; Total clicks: <b id="totalClicksDisplay">0</b></div>
+    </div>
+    <div id="floatLayer" aria-hidden="true"></div>
+  </main>
+
+  <div class="help-dialog" id="helpDialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+    <div class="help-card">
+      <button type="button" class="help-close" aria-label="Close instructions" onclick="closeInstructions()">×</button>
+      <h2 id="helpTitle">Welcome to the void.</h2>
+      <p>Type a nickname and press <strong>Play</strong> to enter the black hole.</p>
+      <p>Click the Jovian in the center to collect <strong>jovianlings</strong>. Spend them on permanent upgrades: some make each click stronger, and others earn jovianlings every second.</p>
+      <p>Keep upgrading. Make an unnecessarily enormous number per second. Your progress saves automatically in your browser.</p>
+      <button type="button" class="submit-button" onclick="closeInstructions()">Understood</button>
+    </div>
+  </div>
+  <div class="toast" id="gameToast" aria-live="polite"></div>
+
+  <!-- ==========================================================================
+       VIEW 2: Creators Page (3 Selectable CVs)
+       ========================================================================== -->
+  <main class="viewport-container view-hidden" id="creatorsView">
+
+    <!-- Top Navigation Bar with 3 Shaded Creator Buttons -->
+    <header class="navbar liquid-glass liquid-glass-pill">
+      <div class="brand-logo" onclick="transitionToLanding()" role="button" tabindex="0">Sonions™</div>
+
+      <div class="creator-tabs" role="tablist" aria-label="Select Creator CV">
+        <button
+          class="creator-tab-btn tab-shade-1 active"
+          data-cv="matthew"
+          onclick="selectCreator('matthew', this)"
+        >
+          Matthew
+        </button>
+        <button
+          class="creator-tab-btn tab-shade-2"
+          data-cv="jovian"
+          onclick="selectCreator('jovian', this)"
+        >
+          Jovian
+        </button>
+        <button
+          class="creator-tab-btn tab-shade-3"
+          data-cv="justin"
+          onclick="selectCreator('justin', this)"
+        >
+          Justin
+        </button>
+      </div>
+
+      <button type="button" class="music-toggle" onclick="toggleMusic()" aria-label="Enable background music" aria-pressed="false"><span class="music-note" aria-hidden="true">♫</span><span class="music-status">Enable music</span></button>
+      <button class="creators-btn" onclick="transitionToLanding()">Back to Home</button>
+    </header>
+
+    <!-- Scrollable Liquid Glass Square Container -->
+    <div class="cv-container liquid-glass liquid-glass-card" id="cvScrollBox">
+
+      <!-- ======================================================================
+           CREATOR 1: Matthew Alexander
+           ====================================================================== -->
+      <div class="cv-panel" id="cv-matthew">
+        <aside class="cv-sidebar">
+          <h1 class="cv-name">Matthew<br>Alexander</h1>
+          <p class="cv-job-title">Computer Science Enjoyer</p>
+
+          <div class="sidebar-block">
+            <h2 class="section-title">Contact</h2>
+            <div class="contact-item">
+              <span class="contact-label">Phone</span>
+              +62 896-0243-5890
+            </div>
+            <div class="contact-item">
+              <span class="contact-label">Email</span>
+              matthew.alexanderch@gmail.com
+            </div>
+            <div class="contact-item">
+              <span class="contact-label">Location</span>
+              Earth
+            </div>
+          </div>
+
+          <div class="sidebar-block">
+            <h2 class="section-title">Skills</h2>
+            <ul class="skill-list">
+              <li>Coding</li>
+              <li>Analytical Thinking</li>
+              <li>Counting</li>
+              <li>Marketing</li>
+              <li>Graphic Design</li>
+            </ul>
+          </div>
+
+          <div class="sidebar-block" style="margin-bottom: 0;">
+            <h2 class="section-title">Language</h2>
+            <ul class="language-list">
+              <li>English</li>
+              <li>Indonesian</li>
+              <li>Mandarin</li>
+            </ul>
+          </div>
+        </aside>
+
+        <div class="cv-content">
+          <section>
+            <h2 class="content-title">About Me</h2>
+            <p class="about-text">
+              Someone proficient in mathematics and applied science who enjoys using computational abilities to solve modern problems.
+            </p>
+          </section>
+
+          <section>
+            <h2 class="content-title">Education</h2>
+            <div class="education-item">
+              <div class="institution">INSTITUT TEKNOLOGI BANDUNG</div>
+              <div class="degree">Bachelor of Technical Information</div>
+              <div class="year">2011 - 2015</div>
+              <div class="score">GPA 3.65</div>
+            </div>
+
+            <div class="education-item">
+              <div class="institution">NATIONAL UNIVERSITY OF SINGAPORE</div>
+              <div class="degree">Master of Computer Science</div>
+              <div class="year">2014 - 2019</div>
+              <div class="score">GPA 3.80</div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="content-title">Achievements</h2>
+            <div class="achievement-item">
+              <div class="achievement-title">NATIONAL SCIENCE OLYMPIAD</div>
+              <div class="achievement-description">Physics Competition — 2025</div>
+              <div class="achievement-description">Managed to get a respectable score.</div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ======================================================================
+           CREATOR 2: Jovian Kurniawan
+           ====================================================================== -->
+      <div class="cv-panel hidden" id="cv-jovian">
+        <aside class="cv-sidebar">
+          <h1 class="cv-name">Jovian<br>Kurniawan</h1>
+          <p class="cv-job-title">Student • Chemical Engineering Aspirant</p>
+
+          <div class="sidebar-block">
+            <h2 class="section-title">Kontak</h2>
+            <div class="contact-item">
+              <span class="contact-label">Phone</span>
+              0896 0243 5890
+            </div>
+            <div class="contact-item">
+              <span class="contact-label">Email</span>
+              jovianrevian@gmail.com
+            </div>
+            <div class="contact-item">
+              <span class="contact-label">Location</span>
+              Bandung, Indonesia
+            </div>
+            <div class="contact-item">
+              <span class="contact-label">Fokus</span>
+              Mathematics • Technology • Design
+            </div>
+          </div>
+
+          <div class="sidebar-block">
+            <h2 class="section-title">Technical & Creative Skills</h2>
+            <ul class="skill-list">
+              <li>Canva</li>
+              <li>Coding</li>
+              <li>Adobe Photoshop</li>
+              <li>Problem Solving</li>
+              <li>Mathematics</li>
+            </ul>
+          </div>
+
+          <div class="sidebar-block" style="margin-bottom: 0;">
+            <h2 class="section-title">Languages</h2>
+            <ul class="language-list">
+              <li>Bahasa Indonesia — Native / First Language (100%)</li>
+              <li>English — Proficient (82%)</li>
+            </ul>
+          </div>
+        </aside>
+
+        <div class="cv-content">
+          <section>
+            <h2 class="content-title">Tentang Saya</h2>
+            <p class="about-text">
+              Siswa SMA dengan ketertarikan pada matematika, teknologi, desain, dan pemecahan masalah. Saat ini mempersiapkan diri untuk melanjutkan pendidikan di bidang Teknik Kimia. Saya adalah siswa SMA BPK Penabur Holis yang memiliki minat kuat dalam bidang matematika dan sains. Saya senang mempelajari hal baru, menyelesaikan masalah secara logis, serta menggabungkan kemampuan teknologi dan kreativitas dalam berbagai tugas dan proyek. Ke depannya, saya tertarik mengembangkan kemampuan tersebut melalui pendidikan Teknik Kimia.
+            </p>
+          </section>
+
+          <section>
+            <h2 class="content-title">Pendidikan</h2>
+            <div class="education-item">
+              <div class="institution">SMA BPK Penabur Holis</div>
+              <div class="year">2024 — SEKARANG</div>
+              <div class="degree">Siswa SMA • Fokus akademik pada Matematika, Fisika, dan Kimia.</div>
+            </div>
+            <div class="education-item">
+              <div class="institution">SMP BPK Penabur Holis</div>
+              <div class="year">2021 — 2024 • 3 TAHUN</div>
+              <div class="degree">Mengembangkan dasar akademik, kemampuan berpikir logis, dan ketertarikan pada matematika.</div>
+            </div>
+            <div class="education-item">
+              <div class="institution">SD BPK Penabur Holis</div>
+              <div class="year">2015 — 2021 • 6 TAHUN</div>
+              <div class="degree">Membangun fondasi akademik dan mengembangkan minat pada matematika serta pembelajaran sains.</div>
+            </div>
+            <div class="education-item">
+              <div class="institution">TK BPK Penabur Holis</div>
+              <div class="year">2013 — 2015 • 2 TAHUN</div>
+              <div class="degree">Memulai pendidikan formal dan mengembangkan kemampuan dasar belajar serta bersosialisasi.</div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="content-title">Academic Interests</h2>
+            <div class="info-grid">
+              <div class="mini-card">
+                <div class="mini-card-title">∑ Mathematics</div>
+                <div class="mini-card-desc">Logical reasoning, problem solving, patterns, and mathematical thinking.</div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">⚛ Physics</div>
+                <div class="mini-card-desc">Memahami fenomena alam melalui konsep, perhitungan, dan pendekatan analitis.</div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">🧪 Chemistry</div>
+                <div class="mini-card-desc">Tertarik pada hubungan antara materi, proses, dan penerapannya dalam kehidupan serta teknologi.</div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="content-title">Prestasi & Kompetisi</h2>
+            <div class="info-grid">
+              <div class="mini-card">
+                <div class="mini-card-title">🥇 SMC — Gold Medal</div>
+                <div class="mini-card-desc">Meraih Gold Medal dalam Singapore and Asian Schools Math Competition (SMC), menunjukkan kemampuan dalam menyelesaikan persoalan matematika secara logis dan sistematis.</div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">🏆 SEAMO</div>
+                <div class="mini-card-desc">Berpartisipasi dalam Southeast Asian Mathematical Olympiad (SEAMO), kompetisi yang menekankan logical reasoning, pattern recognition, dan problem solving.</div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">🏆 AMO</div>
+                <div class="mini-card-desc">Berpartisipasi dalam kompetisi matematika AMO sebagai bagian dari pengembangan kemampuan matematika di luar pembelajaran sekolah.</div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">📐 Math Club</div>
+                <div class="mini-card-desc">Peserta aktif Math Club dan mengikuti pelatihan untuk mempersiapkan diri menghadapi berbagai kompetisi matematika.</div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="content-title">Personal Strengths</h2>
+            <div class="tag-wrap">
+              <span class="pill-tag">Analytical Thinking</span>
+              <span class="pill-tag">Problem Solving</span>
+              <span class="pill-tag">Critical Thinking</span>
+              <span class="pill-tag">Creativity</span>
+              <span class="pill-tag">Adaptability</span>
+              <span class="pill-tag">Attention to Detail</span>
+              <span class="pill-tag">Independent Learning</span>
+              <span class="pill-tag">Teamwork</span>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="content-title">Academic Highlights</h2>
+            <div class="info-grid">
+              <div class="mini-card">
+                <div class="mini-card-title">01 • Mathematics</div>
+                <div class="mini-card-desc">Aktif mengikuti kompetisi dan pelatihan matematika untuk memperkuat kemampuan logika dan problem solving.</div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">02 • Science</div>
+                <div class="mini-card-desc">Memiliki ketertarikan pada Fisika dan Kimia sebagai dasar untuk melanjutkan studi di bidang Teknik Kimia.</div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">03 • Technology & Design</div>
+                <div class="mini-card-desc">Mengembangkan kemampuan coding, Canva, dan Photoshop untuk menggabungkan kemampuan teknis dengan kreativitas.</div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card-title">04 • Continuous Learning</div>
+                <div class="mini-card-desc">Terbiasa belajar mandiri dan mengembangkan kemampuan melalui kegiatan akademik di luar kelas.</div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ======================================================================
+           CREATOR 3: Justin Samuel
+           ====================================================================== -->
+      <div class="cv-panel hidden" id="cv-justin">
+        <aside class="cv-sidebar">
+          <h1 class="cv-name">Justin<br>Samuel</h1>
+          <p class="cv-job-title">Proficient in Mathematics | Analytical Thinker</p>
+
+          <div class="sidebar-block">
+            <h2 class="section-title">Contact</h2>
+            <div class="contact-item">
+              <span class="contact-label">Phone</span>
+              +62 812-2218-9652
+            </div>
+            <div class="contact-item">
+              <span class="contact-label">Email</span>
+              Justinsamuel0804@gmail.com
+            </div>
+            <div class="contact-item">
+              <span class="contact-label">Location</span>
+              Bandung
+            </div>
+          </div>
+
+          <div class="sidebar-block">
+            <h2 class="section-title">Skills</h2>
+            <ul class="skill-list">
+              <li>Counting</li>
+              <li>Problem-solving</li>
+              <li>Translating</li>
+              <li>Analytical thinking</li>
+              <li>Marketing</li>
+            </ul>
+          </div>
+
+          <div class="sidebar-block" style="margin-bottom: 0;">
+            <h2 class="section-title">Languages</h2>
+            <ul class="language-list">
+              <li>English</li>
+              <li>Indonesian</li>
+            </ul>
+          </div>
+        </aside>
+
+        <div class="cv-content">
+          <section>
+            <h2 class="content-title">About Me</h2>
+            <p class="about-text">
+              Someone proficient in mathematics who strives to do the best in whatever endeavours he may pursue.
+            </p>
+          </section>
+
+          <section>
+            <h2 class="content-title">Education</h2>
+            <div class="education-item">
+              <div class="institution">SMP BPK PENABUR HOLIS</div>
+              <div class="year">2020 - 2023</div>
+            </div>
+
+            <div class="education-item">
+              <div class="institution">SMA BPK PENABUR HOLIS</div>
+              <div class="year">2024 - 2026</div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="content-title">Achievements</h2>
+            <div class="achievement-item">
+              <div class="achievement-title">Fusion Expedition - Physics Competition (Unpar)</div>
+              <div class="achievement-description">2025</div>
+            </div>
+            <div class="achievement-item">
+              <div class="achievement-title">Parahyangan Creations - Physics Competition (Teknik Sipil Unpar)</div>
+              <div class="achievement-description">2025</div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Attribution -->
+    <footer class="ai-attribution">
+      *made with AI
+    </footer>
+
+  </main>
+
+  <!-- ==========================================================================
+       7. JavaScript: Video Speed, Hyperspace Warp, Space Stars & CV Switcher
+       ========================================================================== -->
+  <script src="js/game.js"></script>
+
+</body>
+</html>
